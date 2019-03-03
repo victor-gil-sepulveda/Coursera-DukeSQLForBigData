@@ -189,39 +189,25 @@ ORDER BY avg_daily_revenue;
 ---------------
 -- Which department in which store had the greatest percent increase in average daily sales revenue from November to December, and what city and state was that store located in? Only examine departments whose total sales were at least $1,000 in both November and December.
 
-SELECT T2.store, T2.dept, deptinfo.deptdesc, msa.city, msa.state, percent_inc
-FROM (
-	SELECT T.store, T.dept, 
-		SUM(CASE WHEN T.dm=11 THEN T.num_days END) AS nov_day_sum,
-		SUM(CASE WHEN T.dm=12 THEN T.num_days END) AS dic_day_sum,
-		SUM(CASE WHEN T.dm=11 THEN T.daily_revenue END) AS nov_rev_sum,
-		SUM(CASE WHEN T.dm=12 THEN T.daily_revenue END) AS dic_rev_sum,
-		nov_rev_sum / nov_day_sum AS y,
-	 	dic_rev_sum / dic_day_sum AS x,
-		((x-y)/y)*100 AS percent_inc
-	FROM (
-		SELECT trnsact.store, skuinfo.dept, 
-			EXTRACT(MONTH FROM saledate) AS dm, 
-			EXTRACT (YEAR FROM saledate) AS dy, 
-			COUNT(DISTINCT saledate) AS num_days, 
-			SUM(amt) AS daily_revenue
-		FROM trnsact
-		JOIN skuinfo
-		ON trnsact.sku = skuinfo.sku  
-		WHERE stype = 'P'
-		GROUP BY trnsact.store, skuinfo.dept, dm, dy
-		HAVING num_days > 20 
-				AND dm IN(11,12)) AS T
-	GROUP BY T.store, T.dept
-	HAVING nov_rev_sum >= 1000 
-		AND dic_rev_sum >= 1000 ) AS T2
-JOIN store_msa AS msa
-ON T2.store = msa.store
-JOIN deptinfo
-ON T2.dept = deptinfo.dept
-WHERE percent_inc IS NOT NULL
-ORDER BY percent_inc DESC;
--- Cannot get te correct result, possibly Pine Bluff, AR
+SELECT	s.store,	s.city,	s.state,	d.deptdesc, sum(case	when	extract(month	from	saledate)=11	then	amt	
+end)	as	November,
+COUNT(DISTINCT	(case	WHEN	EXTRACT(MONTH	from	saledate)	='11'	then	saledate	END))	as	Nov_numdays,
+sum(case	when	extract(month	from	saledate)=12 then	amt	end)	as	December,
+COUNT(DISTINCT	(case	WHEN	EXTRACT(MONTH	from	saledate)	='12'	then	saledate	END))	as	Dec_numdays,
+((December/Dec_numdays)-(November/Nov_numdays))/(November/Nov_numdays)*100	AS	bump
+FROM	trnsact	t	JOIN	strinfo	s
+ON	t.store=s.store	JOIN	skuinfo	si
+ON	t.sku=si.sku	JOIN	deptinfo	d
+ON	si.dept=d.dept
+WHERE	t.stype='P'	and	t.store||EXTRACT(YEAR	from	t.saledate)||EXTRACT(MONTH	from	t.saledate)	IN
+(SELECT	store||EXTRACT(YEAR	from	saledate)||EXTRACT(MONTH	from	saledate)
+FROM	trnsact	
+GROUP	BY	store,	EXTRACT(YEAR	from	saledate),	EXTRACT(MONTH	from	saledate)
+HAVING	COUNT(DISTINCT	saledate)>=	20)
+GROUP	BY	s.store,	s.city,	s.state,	d.deptdesc
+HAVING	November	>	1000	AND	December	>	1000
+ORDER	BY	bump	DESC;
+-- Louisvl department, Salina,	KS
 
 
 ---------------
